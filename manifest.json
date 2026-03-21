@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Page Summarizer AI",
-  "version": "1.0.0",
-  "description": "Capture and summarize any webpage using Claude or ChatGPT",
+  "name": "Summy",
+  "version": "1.04",
+  "description": "AI-powered page summaries & chat using Claude, ChatGPT, or DeepSeek",
   "permissions": [
     "activeTab",
     "scripting",

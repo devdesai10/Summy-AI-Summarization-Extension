@@ -1,9 +1,10 @@
-// ─── Content Script ─────────────────────────────────────────
-// Side panel: Summarize + Chat + Voice — all CSS inlined in shadow DOM
+// ─── Summy v1.04 ───────────────────────────────────────────
+// Side panel: Summarize (bottom) + Always-on Chat + Voice
+// Providers: Claude, ChatGPT, DeepSeek
 
 (function () {
-  if (window.__pageSummarizerInjected) return;
-  window.__pageSummarizerInjected = true;
+  if (window.__summyInjected) return;
+  window.__summyInjected = true;
 
   let panelOpen = false;
   let panel = null;
@@ -34,9 +35,7 @@
         overflow: hidden;
         padding: 24px 20px 0;
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-        color: #e4e6f0;
-        font-size: 14px;
-        line-height: 1.55;
+        color: #e4e6f0; font-size: 14px; line-height: 1.55;
       }
 
       /* close */
@@ -57,10 +56,11 @@
       }
       .ps-logo {
         width: 42px; height: 42px; border-radius: 11px;
-        background: linear-gradient(135deg, #d97757, #b05838);
+        background: linear-gradient(135deg, #6C5CE7, #a855f7);
         display: flex; align-items: center; justify-content: center;
         color: #fff; flex-shrink: 0;
-        box-shadow: 0 4px 14px rgba(217,119,87,0.25);
+        box-shadow: 0 4px 14px rgba(108,92,231,0.3);
+        font-weight: 800; font-size: 20px; letter-spacing: -1px;
       }
       .ps-header-text { display: flex; flex-direction: column; }
       .ps-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; color: #e4e6f0; }
@@ -82,6 +82,7 @@
       .ps-provider-btn:hover { transform: translateY(-1px); }
       .ps-provider--claude:hover { border-color: #d97757; box-shadow: 0 4px 18px rgba(217,119,87,0.25); }
       .ps-provider--gpt:hover { border-color: #19c37d; box-shadow: 0 4px 18px rgba(25,195,125,0.25); }
+      .ps-provider--deepseek:hover { border-color: #4A9EFF; box-shadow: 0 4px 18px rgba(74,158,255,0.25); }
 
       .ps-provider-icon {
         width: 38px; height: 38px; border-radius: 9px;
@@ -89,6 +90,7 @@
       }
       .ps-icon--claude { background: rgba(217,119,87,0.15); color: #d97757; }
       .ps-icon--gpt { background: rgba(25,195,125,0.12); color: #19c37d; }
+      .ps-icon--deepseek { background: rgba(74,158,255,0.12); color: #4A9EFF; }
 
       .ps-provider-text { display: flex; flex-direction: column; flex: 1; }
       .ps-provider-text strong { font-size: 14px; font-weight: 600; }
@@ -103,7 +105,6 @@
         transition: color 0.2s;
       }
       .ps-back:hover { color: #e4e6f0; }
-
       .ps-input-wrap { position: relative; margin-bottom: 14px; }
       .ps-input {
         width: 100%; padding: 12px 44px 12px 14px; border-radius: 12px;
@@ -111,16 +112,14 @@
         font-size: 13px; font-family: 'SFMono-Regular','Consolas',monospace;
         outline: none; transition: border-color 0.2s, box-shadow 0.2s;
       }
-      .ps-input:focus { border-color: #d97757; box-shadow: 0 0 0 3px rgba(217,119,87,0.25); }
+      .ps-input:focus { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.25); }
       .ps-input.ps-shake { animation: shake 0.4s ease; }
       @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
-
       .ps-toggle-vis {
         position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
         background: none; border: none; color: #8b8fa4; cursor: pointer; padding: 4px;
       }
       .ps-toggle-vis:hover { color: #e4e6f0; }
-
       .ps-hint { font-size: 11px; color: #8b8fa4; margin-top: 10px; }
 
       /* buttons */
@@ -131,10 +130,10 @@
       .ps-btn:active { transform: scale(0.97); }
       .ps-btn--primary {
         width: 100%; padding: 13px 20px;
-        background: linear-gradient(135deg, #d97757, #b05838);
-        color: #fff; box-shadow: 0 4px 16px rgba(217,119,87,0.25);
+        background: linear-gradient(135deg, #6C5CE7, #a855f7);
+        color: #fff; box-shadow: 0 4px 16px rgba(108,92,231,0.3);
       }
-      .ps-btn--primary:hover { box-shadow: 0 6px 24px rgba(217,119,87,0.25); }
+      .ps-btn--primary:hover { box-shadow: 0 6px 24px rgba(108,92,231,0.3); }
       .ps-btn--sm { padding: 8px 18px; background: #22253a; color: #e4e6f0; font-size: 13px; }
       .ps-btn--sm:hover { background: #2a2d3e; }
 
@@ -147,6 +146,7 @@
       .ps-badge-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
       .ps-dot--claude { background: #d97757; box-shadow: 0 0 6px rgba(217,119,87,0.25); }
       .ps-dot--gpt { background: #19c37d; box-shadow: 0 0 6px rgba(25,195,125,0.25); }
+      .ps-dot--deepseek { background: #4A9EFF; box-shadow: 0 0 6px rgba(74,158,255,0.25); }
       .ps-badge-label { color: #8b8fa4; }
       .ps-badge-name { font-weight: 600; }
       .ps-change-provider {
@@ -156,102 +156,12 @@
       }
       .ps-change-provider:hover { color: #e4e6f0; }
 
-      /* tabs */
-      .ps-tabs {
-        display: flex; gap: 4px; margin-bottom: 16px; background: #181a24;
-        border: 1px solid #2a2d3e; border-radius: 12px; padding: 4px; flex-shrink: 0;
+      /* ── MAIN LAYOUT: chat area + bottom bar ── */
+      .ps-main-body {
+        flex: 1; display: flex; flex-direction: column; overflow: hidden;
       }
-      .ps-tab {
-        flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
-        padding: 10px 0; border: none; background: transparent; color: #8b8fa4;
-        font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-        border-radius: 9px; transition: background 0.2s, color 0.2s;
-      }
-      .ps-tab:hover { color: #e4e6f0; }
-      .ps-tab--active { background: #22253a; color: #e4e6f0; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
 
-      .ps-tab-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-      /* page card */
-      .ps-page-card {
-        display: flex; align-items: center; gap: 12px; padding: 14px;
-        background: #181a24; border: 1px solid #2a2d3e;
-        border-radius: 12px; margin-bottom: 16px; flex-shrink: 0;
-      }
-      .ps-page-icon {
-        width: 38px; height: 38px; border-radius: 9px; background: #22253a;
-        display: flex; align-items: center; justify-content: center;
-        color: #8b8fa4; flex-shrink: 0;
-      }
-      .ps-page-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-      .ps-page-title { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .ps-page-url { font-size: 11px; color: #8b8fa4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-      /* summarize button */
-      .ps-btn--summarize {
-        width: 100%; display: flex; align-items: center; gap: 14px; padding: 18px;
-        background: linear-gradient(135deg, #d97757, #c45a30); border: none;
-        border-radius: 12px; cursor: pointer; color: #fff; font-family: inherit;
-        text-align: left; box-shadow: 0 6px 24px rgba(217,119,87,0.25), 0 2px 8px rgba(0,0,0,0.3);
-        transition: transform 0.15s, box-shadow 0.2s; margin-bottom: 16px; flex-shrink: 0;
-      }
-      .ps-btn--summarize:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(217,119,87,0.25), 0 4px 12px rgba(0,0,0,0.4); }
-      .ps-btn--summarize:active { transform: translateY(0) scale(0.98); }
-      .ps-btn-icon {
-        width: 44px; height: 44px; border-radius: 11px; background: rgba(255,255,255,0.18);
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      }
-      .ps-btn-text { display: flex; flex-direction: column; gap: 2px; }
-      .ps-btn-text strong { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
-      .ps-btn-text small { font-size: 11px; opacity: 0.75; font-weight: 400; }
-
-      /* loading */
-      .ps-loading {
-        display: flex; flex-direction: column; align-items: center; gap: 10px;
-        padding: 36px 0 24px; animation: fadeUp 0.3s ease both;
-      }
-      .ps-loading-text { font-size: 14px; font-weight: 600; }
-      .ps-loading-sub { font-size: 12px; color: #8b8fa4; }
-      .ps-spinner {
-        width: 34px; height: 34px; border: 3px solid #22253a;
-        border-top-color: #d97757; border-radius: 50%; animation: spin 0.8s linear infinite;
-      }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-      /* result */
-      .ps-result {
-        padding: 18px; background: #181a24; border: 1px solid #2a2d3e;
-        border-radius: 12px; animation: fadeUp 0.35s ease both;
-        overflow-y: auto; flex: 1;
-      }
-      .ps-result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-      .ps-result-header h2 { font-size: 14px; font-weight: 700; }
-      .ps-result-actions { display: flex; gap: 6px; }
-      .ps-icon-btn {
-        background: #22253a; border: 1px solid #2a2d3e;
-        border-radius: 8px; width: 30px; height: 30px;
-        display: flex; align-items: center; justify-content: center;
-        cursor: pointer; color: #8b8fa4; transition: color 0.2s, background 0.2s;
-      }
-      .ps-icon-btn:hover { color: #e4e6f0; background: #2a2d3e; }
-      .ps-icon-btn.ps-copied { color: #19c37d; }
-
-      .ps-result-body { font-size: 13px; line-height: 1.7; }
-      .ps-result-body .ps-h3 { font-size: 13px; font-weight: 700; margin: 14px 0 5px; }
-      .ps-result-body .ps-ul { padding-left: 16px; margin: 6px 0; list-style: none; }
-      .ps-result-body .ps-li { position: relative; padding-left: 12px; margin-bottom: 5px; }
-      .ps-result-body .ps-li::before { content: ""; position: absolute; left: 0; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: #d97757; }
-      .ps-result-body code { background: #22253a; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-
-      .ps-error {
-        margin-bottom: 12px; padding: 14px; background: rgba(239,68,68,0.08);
-        border: 1px solid rgba(239,68,68,0.2); border-radius: 12px;
-        display: flex; flex-direction: column; gap: 10px; animation: fadeUp 0.3s ease both;
-      }
-      .ps-error p { font-size: 13px; color: #f87171; }
-
-      /* chat */
+      /* chat messages */
       .ps-chat-messages {
         flex: 1; overflow-y: auto; padding: 4px 2px 12px;
         display: flex; flex-direction: column; gap: 12px;
@@ -259,7 +169,7 @@
       }
       .ps-chat-welcome {
         display: flex; flex-direction: column; align-items: center;
-        text-align: center; padding: 40px 20px; gap: 10px; margin: auto 0;
+        text-align: center; padding: 30px 20px; gap: 10px; margin: auto 0;
       }
       .ps-chat-welcome-icon {
         width: 56px; height: 56px; border-radius: 16px; background: #181a24;
@@ -267,7 +177,7 @@
         justify-content: center; color: #8b8fa4; margin-bottom: 4px;
       }
       .ps-chat-welcome-title { font-size: 15px; font-weight: 700; }
-      .ps-chat-welcome-sub { font-size: 12px; color: #8b8fa4; line-height: 1.5; }
+      .ps-chat-welcome-sub { font-size: 12px; color: #8b8fa4; line-height: 1.5; max-width: 280px; }
 
       .ps-chat-msg { display: flex; animation: fadeUp 0.25s ease both; }
       .ps-chat-msg--user { justify-content: flex-end; }
@@ -279,7 +189,7 @@
         font-size: 13px; line-height: 1.6; word-wrap: break-word;
       }
       .ps-msg--user {
-        background: linear-gradient(135deg, #d97757, #c45a30);
+        background: linear-gradient(135deg, #6C5CE7, #a855f7);
         color: #fff; border-bottom-right-radius: 4px;
       }
       .ps-msg--ai {
@@ -289,10 +199,10 @@
       .ps-msg--ai .ps-h3 { font-size: 13px; font-weight: 700; margin: 10px 0 4px; }
       .ps-msg--ai .ps-ul { padding-left: 14px; margin: 4px 0; list-style: none; }
       .ps-msg--ai .ps-li { position: relative; padding-left: 12px; margin-bottom: 4px; }
-      .ps-msg--ai .ps-li::before { content: ""; position: absolute; left: 0; top: 8px; width: 4px; height: 4px; border-radius: 50%; background: #d97757; }
+      .ps-msg--ai .ps-li::before { content: ""; position: absolute; left: 0; top: 8px; width: 4px; height: 4px; border-radius: 50%; background: #6C5CE7; }
+      .ps-msg--ai code { background: #22253a; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
       .ps-msg--error {
-        background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
-        color: #f87171;
+        background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #f87171;
       }
 
       .ps-typing { display: flex; align-items: center; gap: 5px; padding: 14px 18px; }
@@ -306,16 +216,45 @@
         0%,80%,100% { opacity: 0.3; transform: scale(0.8); }
         40% { opacity: 1; transform: scale(1); }
       }
+      @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-      /* chat input */
-      .ps-chat-input-area { flex-shrink: 0; padding: 12px 0 16px; border-top: 1px solid #2a2d3e; }
+      /* ── summary result (appears in chat area) ── */
+      .ps-summary-card {
+        padding: 16px; background: #181a24; border: 1px solid #2a2d3e;
+        border-radius: 12px; animation: fadeUp 0.35s ease both;
+      }
+      .ps-summary-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .ps-summary-header h2 { font-size: 14px; font-weight: 700; }
+      .ps-summary-actions { display: flex; gap: 6px; }
+      .ps-icon-btn {
+        background: #22253a; border: 1px solid #2a2d3e;
+        border-radius: 8px; width: 30px; height: 30px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; color: #8b8fa4; transition: color 0.2s, background 0.2s;
+      }
+      .ps-icon-btn:hover { color: #e4e6f0; background: #2a2d3e; }
+      .ps-icon-btn.ps-copied { color: #19c37d; }
+      .ps-summary-body { font-size: 13px; line-height: 1.7; }
+      .ps-summary-body .ps-h3 { font-size: 13px; font-weight: 700; margin: 14px 0 5px; }
+      .ps-summary-body .ps-ul { padding-left: 16px; margin: 6px 0; list-style: none; }
+      .ps-summary-body .ps-li { position: relative; padding-left: 12px; margin-bottom: 5px; }
+      .ps-summary-body .ps-li::before { content: ""; position: absolute; left: 0; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: #6C5CE7; }
+      .ps-summary-body code { background: #22253a; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+      /* ── bottom bar: chat input + summarize ── */
+      .ps-bottom-bar {
+        flex-shrink: 0; padding: 12px 0 16px;
+        border-top: 1px solid #2a2d3e;
+        display: flex; flex-direction: column; gap: 10px;
+      }
+
       .ps-chat-input-wrap {
         display: flex; align-items: flex-end; gap: 8px;
         background: #181a24; border: 1px solid #2a2d3e;
         border-radius: 12px; padding: 8px 8px 8px 14px;
         transition: border-color 0.2s, box-shadow 0.2s;
       }
-      .ps-chat-input-wrap:focus-within { border-color: #d97757; box-shadow: 0 0 0 3px rgba(217,119,87,0.25); }
+      .ps-chat-input-wrap:focus-within { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.25); }
 
       .ps-chat-textarea {
         flex: 1; background: none; border: none; color: #e4e6f0;
@@ -345,37 +284,61 @@
 
       .ps-send-btn {
         width: 36px; height: 36px; border-radius: 10px; border: none;
-        background: linear-gradient(135deg, #d97757, #c45a30);
+        background: linear-gradient(135deg, #6C5CE7, #a855f7);
         color: #fff; cursor: pointer;
         display: flex; align-items: center; justify-content: center;
         transition: transform 0.1s, box-shadow 0.2s;
-        box-shadow: 0 2px 8px rgba(217,119,87,0.25);
+        box-shadow: 0 2px 8px rgba(108,92,231,0.25);
       }
-      .ps-send-btn:hover { transform: scale(1.05); box-shadow: 0 4px 14px rgba(217,119,87,0.25); }
+      .ps-send-btn:hover { transform: scale(1.05); box-shadow: 0 4px 14px rgba(108,92,231,0.3); }
       .ps-send-btn:active { transform: scale(0.95); }
 
-      .ps-chat-hint { font-size: 11px; color: #8b8fa4; margin-top: 8px; text-align: center; }
+      .ps-voice-hint { font-size: 11px; color: #8b8fa4; text-align: center; }
+
+      /* summarize button — at the bottom */
+      .ps-btn--summarize {
+        width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+        padding: 14px 18px;
+        background: linear-gradient(135deg, #6C5CE7, #a855f7); border: none;
+        border-radius: 12px; cursor: pointer; color: #fff; font-family: inherit;
+        font-size: 14px; font-weight: 700; letter-spacing: -0.2px;
+        box-shadow: 0 4px 18px rgba(108,92,231,0.3), 0 2px 6px rgba(0,0,0,0.2);
+        transition: transform 0.15s, box-shadow 0.2s;
+      }
+      .ps-btn--summarize:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(108,92,231,0.35), 0 3px 10px rgba(0,0,0,0.3); }
+      .ps-btn--summarize:active { transform: translateY(0) scale(0.98); }
+
+      .ps-loading-inline {
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+        padding: 14px; color: #8b8fa4; font-size: 13px;
+      }
+      .ps-spinner-sm {
+        width: 20px; height: 20px; border: 2px solid #22253a;
+        border-top-color: #6C5CE7; border-radius: 50%; animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .ps-error-inline {
+        padding: 10px 14px; background: rgba(239,68,68,0.08);
+        border: 1px solid rgba(239,68,68,0.2); border-radius: 10px;
+        font-size: 13px; color: #f87171; text-align: center;
+      }
     `;
   }
 
   /* ── build panel ───────────────────────────────── */
   function createPanel() {
     panel = document.createElement("div");
-    panel.id = "ps-ai-root";
+    panel.id = "summy-root";
     panel.style.cssText = [
-      "position: fixed",
-      "top: 0",
-      "right: 0",
-      "width: " + PANEL_WIDTH + "px",
-      "height: 100vh",
+      "position: fixed", "top: 0", "right: 0",
+      "width: " + PANEL_WIDTH + "px", "height: 100vh",
       "z-index: 2147483647",
       "transform: translateX(100%)",
       "transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
     ].join(" !important;") + " !important;";
 
     shadow = panel.attachShadow({ mode: "open" });
-
-    // Inline style — no external file needed
     const styleEl = document.createElement("style");
     styleEl.textContent = getCSS();
     shadow.appendChild(styleEl);
@@ -387,7 +350,6 @@
 
     document.body.appendChild(panel);
 
-    // Slide in after paint
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         panel.style.setProperty("transform", "translateX(0)", "important");
@@ -403,16 +365,14 @@
   function getHTML() {
     return `
     <div class="ps-container">
-      <button class="ps-close" aria-label="Close panel">
+      <button class="ps-close" aria-label="Close">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
 
       <div class="ps-header">
-        <div class="ps-logo">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        </div>
+        <div class="ps-logo">S</div>
         <div class="ps-header-text">
-          <h1 class="ps-title">Page Summarizer</h1>
+          <h1 class="ps-title">Summy</h1>
           <span class="ps-subtitle">AI-powered summaries &amp; chat</span>
         </div>
       </div>
@@ -420,14 +380,22 @@
       <!-- AUTH -->
       <div class="ps-view" id="ps-auth">
         <p class="ps-section-label">Choose your AI provider</p>
+
         <button class="ps-provider-btn ps-provider--claude" data-provider="claude">
           <span class="ps-provider-icon ps-icon--claude"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4.709 15.955l4.397-2.85-.379-.597-4.805 2.752a.667.667 0 0 0-.247.91l3.263 5.657a.667.667 0 0 0 .91.247l.597-.345-3.736-6.474zm8.958-12.622L9.27 10.06l.597.345L14.64 3.6a.667.667 0 0 0-.247-.911L8.736.124a.667.667 0 0 0-.91.247l-.345.597 6.186 2.365zm5.324 5.258h-5.28v.69h5.583a.667.667 0 0 0 .667-.667V2.26a.667.667 0 0 0-.667-.667h-.69l.387 7.0zm-13.982 6.818h5.28v-.69H4.706a.667.667 0 0 0-.667.667v6.354a.667.667 0 0 0 .667.667h.69l-.387-6.998z"/></svg></span>
           <span class="ps-provider-text"><strong>Sign in with Claude</strong><small>Anthropic API</small></span>
           <span class="ps-arrow">&rarr;</span>
         </button>
+
         <button class="ps-provider-btn ps-provider--gpt" data-provider="chatgpt">
           <span class="ps-provider-icon ps-icon--gpt"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.602 1.5v3.001l-2.602 1.5-2.602-1.5z"/></svg></span>
           <span class="ps-provider-text"><strong>Sign in with ChatGPT</strong><small>OpenAI API</small></span>
+          <span class="ps-arrow">&rarr;</span>
+        </button>
+
+        <button class="ps-provider-btn ps-provider--deepseek" data-provider="deepseek">
+          <span class="ps-provider-icon ps-icon--deepseek"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg></span>
+          <span class="ps-provider-text"><strong>Sign in with DeepSeek</strong><small>DeepSeek API</small></span>
           <span class="ps-arrow">&rarr;</span>
         </button>
       </div>
@@ -455,50 +423,20 @@
           <button class="ps-change-provider" id="ps-switch">Switch</button>
         </div>
 
-        <div class="ps-tabs">
-          <button class="ps-tab ps-tab--active" data-tab="summarize">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            Summarize
-          </button>
-          <button class="ps-tab" data-tab="chat">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            Chat
-          </button>
-        </div>
-
-        <!-- SUMMARIZE TAB -->
-        <div class="ps-tab-content" id="ps-tab-summarize">
-          <div class="ps-page-card">
-            <div class="ps-page-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div>
-            <div class="ps-page-info">
-              <span class="ps-page-title" id="ps-page-title">Current Page</span>
-              <span class="ps-page-url" id="ps-page-url">example.com</span>
-            </div>
-          </div>
-          <button class="ps-btn ps-btn--summarize" id="ps-summarize">
-            <span class="ps-btn-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
-            <span class="ps-btn-text"><strong>Summarize This Page</strong><small>Capture &amp; analyze full page content</small></span>
-          </button>
-          <div class="ps-loading hidden" id="ps-s-loading"><div class="ps-spinner"></div><p class="ps-loading-text">Reading page content...</p><p class="ps-loading-sub">This usually takes 5-10 seconds</p></div>
-          <div class="ps-result hidden" id="ps-s-result">
-            <div class="ps-result-header"><h2>Summary</h2><div class="ps-result-actions"><button class="ps-icon-btn" id="ps-copy" title="Copy"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div></div>
-            <div class="ps-result-body" id="ps-s-result-body"></div>
-          </div>
-          <div class="ps-error hidden" id="ps-s-error"><p id="ps-s-error-msg"></p><button class="ps-btn ps-btn--sm" id="ps-s-retry">Try Again</button></div>
-        </div>
-
-        <!-- CHAT TAB -->
-        <div class="ps-tab-content hidden" id="ps-tab-chat">
+        <div class="ps-main-body">
+          <!-- Chat / summary area -->
           <div class="ps-chat-messages" id="ps-chat-messages">
             <div class="ps-chat-welcome">
               <div class="ps-chat-welcome-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-              <p class="ps-chat-welcome-title">Chat about this page</p>
-              <p class="ps-chat-welcome-sub">Ask questions, get explanations, or dig deeper into the content.</p>
+              <p class="ps-chat-welcome-title">Welcome to Summy</p>
+              <p class="ps-chat-welcome-sub">Summarize this page with the button below, or ask any question about its content.</p>
             </div>
           </div>
-          <div class="ps-chat-input-area">
+
+          <!-- Bottom bar: chat input + summarize -->
+          <div class="ps-bottom-bar">
             <div class="ps-chat-input-wrap">
-              <textarea id="ps-chat-input" class="ps-chat-textarea" rows="1" placeholder="Ask about this page..."></textarea>
+              <textarea id="ps-chat-input" class="ps-chat-textarea" rows="1" placeholder="Ask anything about this page..."></textarea>
               <div class="ps-chat-btns">
                 <button class="ps-voice-btn" id="ps-voice-btn" title="Voice input">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
@@ -508,10 +446,13 @@
                 </button>
               </div>
             </div>
-            <p class="ps-chat-hint" id="ps-voice-status">Press the mic to talk</p>
+            <p class="ps-voice-hint hidden" id="ps-voice-status">Listening...</p>
+            <button class="ps-btn ps-btn--summarize" id="ps-summarize">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Summarize This Page
+            </button>
           </div>
         </div>
-
       </div>
     </div>`;
   }
@@ -524,11 +465,14 @@
 
     $(".ps-close").addEventListener("click", togglePanel);
 
+    // provider pick
     $$(".ps-provider-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         chosenProvider = btn.dataset.provider;
-        $("#ps-key-title").textContent = "Enter your " + (chosenProvider === "claude" ? "Claude (Anthropic)" : "ChatGPT (OpenAI)") + " API key";
-        $("#ps-api-input").placeholder = chosenProvider === "claude" ? "sk-ant-..." : "sk-...";
+        const labels = { claude: "Claude (Anthropic)", chatgpt: "ChatGPT (OpenAI)", deepseek: "DeepSeek" };
+        const placeholders = { claude: "sk-ant-...", chatgpt: "sk-...", deepseek: "sk-..." };
+        $("#ps-key-title").textContent = "Enter your " + labels[chosenProvider] + " API key";
+        $("#ps-api-input").placeholder = placeholders[chosenProvider];
         showView("key");
         chrome.storage.local.get([chosenProvider + "_key"], (res) => {
           if (res[chosenProvider + "_key"]) $("#ps-api-input").value = res[chosenProvider + "_key"];
@@ -538,8 +482,7 @@
 
     $("#ps-back-to-auth").addEventListener("click", () => showView("auth"));
     $("#ps-toggle-key").addEventListener("click", () => {
-      const inp = $("#ps-api-input");
-      inp.type = inp.type === "password" ? "text" : "password";
+      const inp = $("#ps-api-input"); inp.type = inp.type === "password" ? "text" : "password";
     });
 
     $("#ps-save-key").addEventListener("click", () => {
@@ -551,25 +494,8 @@
 
     $("#ps-switch").addEventListener("click", () => showView("auth"));
 
-    // tabs
-    $$(".ps-tab").forEach((tab) => {
-      tab.addEventListener("click", () => {
-        $$(".ps-tab").forEach((t) => t.classList.remove("ps-tab--active"));
-        tab.classList.add("ps-tab--active");
-        $$(".ps-tab-content").forEach((c) => c.classList.add("hidden"));
-        $("#ps-tab-" + tab.dataset.tab).classList.remove("hidden");
-      });
-    });
-
     // summarize
     $("#ps-summarize").addEventListener("click", () => runSummary());
-    $("#ps-s-retry").addEventListener("click", () => runSummary());
-    $("#ps-copy").addEventListener("click", () => {
-      navigator.clipboard.writeText($("#ps-s-result-body").innerText).then(() => {
-        const btn = $("#ps-copy"); btn.innerHTML = "&#10003;"; btn.classList.add("ps-copied");
-        setTimeout(() => { btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; btn.classList.remove("ps-copied"); }, 1500);
-      });
-    });
 
     // chat
     $("#ps-send-btn").addEventListener("click", () => sendChat());
@@ -580,39 +506,67 @@
     function showView(name) { $$(".ps-view").forEach((v) => v.classList.add("hidden")); $("#ps-" + name).classList.remove("hidden"); }
 
     function enterMain() {
-      $("#ps-badge-name").textContent = chosenProvider === "claude" ? "Claude" : "ChatGPT";
-      $("#ps-badge-dot").className = "ps-badge-dot " + (chosenProvider === "claude" ? "ps-dot--claude" : "ps-dot--gpt");
-      $("#ps-page-title").textContent = document.title || "Untitled Page";
-      $("#ps-page-url").textContent = location.hostname + location.pathname;
+      const names = { claude: "Claude", chatgpt: "ChatGPT", deepseek: "DeepSeek" };
+      const dotClass = { claude: "ps-dot--claude", chatgpt: "ps-dot--gpt", deepseek: "ps-dot--deepseek" };
+      $("#ps-badge-name").textContent = names[chosenProvider];
+      $("#ps-badge-dot").className = "ps-badge-dot " + dotClass[chosenProvider];
       pageContext = capturePageContent();
       chatHistory = [];
       showView("main");
     }
 
-    chrome.storage.local.get(["active_provider", "claude_key", "chatgpt_key"], (res) => {
+    chrome.storage.local.get(["active_provider", "claude_key", "chatgpt_key", "deepseek_key"], (res) => {
       if (res.active_provider && res[res.active_provider + "_key"]) { chosenProvider = res.active_provider; enterMain(); }
     });
 
+    /* ── summarize ── */
     async function runSummary() {
-      $("#ps-summarize").classList.add("hidden");
-      $("#ps-s-result").classList.add("hidden");
-      $("#ps-s-error").classList.add("hidden");
-      $("#ps-s-loading").classList.remove("hidden");
+      const container = $("#ps-chat-messages");
+      const welcome = $(".ps-chat-welcome"); if (welcome) welcome.remove();
+
+      // add loading into chat area
+      const loadEl = document.createElement("div");
+      loadEl.className = "ps-loading-inline";
+      loadEl.id = "ps-s-loading";
+      loadEl.innerHTML = '<div class="ps-spinner-sm"></div> Summarizing page...';
+      container.appendChild(loadEl);
+      container.scrollTop = container.scrollHeight;
+
       try {
         const apiKey = await getKey();
         const summary = await callAI(chosenProvider, apiKey, buildSummarizePrompt(pageContext));
-        $("#ps-s-result-body").innerHTML = formatMarkdown(summary);
-        $("#ps-s-loading").classList.add("hidden");
-        $("#ps-s-result").classList.remove("hidden");
-        $("#ps-summarize").classList.remove("hidden");
+        const lEl = shadow.getElementById("ps-s-loading"); if (lEl) lEl.remove();
+
+        // insert summary card
+        const card = document.createElement("div");
+        card.className = "ps-summary-card";
+        card.innerHTML = '<div class="ps-summary-header"><h2>Summary</h2><div class="ps-summary-actions"><button class="ps-icon-btn ps-copy-btn" title="Copy"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div></div><div class="ps-summary-body">' + formatMarkdown(summary) + '</div>';
+        container.appendChild(card);
+        container.scrollTop = container.scrollHeight;
+
+        // copy handler
+        card.querySelector(".ps-copy-btn").addEventListener("click", () => {
+          navigator.clipboard.writeText(card.querySelector(".ps-summary-body").innerText).then(() => {
+            const b = card.querySelector(".ps-copy-btn"); b.innerHTML = "&#10003;"; b.classList.add("ps-copied");
+            setTimeout(() => { b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; b.classList.remove("ps-copied"); }, 1500);
+          });
+        });
+
+        // also add to chat history so AI remembers it
+        chatHistory.push({ role: "user", content: "Summarize this page." });
+        chatHistory.push({ role: "assistant", content: summary });
+
       } catch (err) {
-        $("#ps-s-loading").classList.add("hidden");
-        $("#ps-summarize").classList.remove("hidden");
-        $("#ps-s-error-msg").textContent = err.message || "Something went wrong.";
-        $("#ps-s-error").classList.remove("hidden");
+        const lEl = shadow.getElementById("ps-s-loading"); if (lEl) lEl.remove();
+        const errEl = document.createElement("div");
+        errEl.className = "ps-error-inline";
+        errEl.textContent = err.message || "Something went wrong.";
+        container.appendChild(errEl);
+        container.scrollTop = container.scrollHeight;
       }
     }
 
+    /* ── chat ── */
     async function sendChat() {
       const input = $("#ps-chat-input");
       const text = input.value.trim();
@@ -648,33 +602,33 @@
     function appendTyping() {
       const id = "ps-typing-" + (++tc);
       const c = $("#ps-chat-messages");
-      const el = document.createElement("div");
-      el.className = "ps-chat-msg ps-chat-msg--assistant"; el.id = id;
+      const el = document.createElement("div"); el.className = "ps-chat-msg ps-chat-msg--assistant"; el.id = id;
       el.innerHTML = '<div class="ps-msg-bubble ps-msg--ai ps-typing"><span class="ps-dot-pulse"></span><span class="ps-dot-pulse"></span><span class="ps-dot-pulse"></span></div>';
-      c.appendChild(el); c.scrollTop = c.scrollHeight;
-      return id;
+      c.appendChild(el); c.scrollTop = c.scrollHeight; return id;
     }
     function removeTyping(id) { const el = shadow.getElementById(id); if (el) el.remove(); }
 
+    /* ── voice ── */
     function toggleVoice() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) { $("#ps-voice-status").textContent = "Speech recognition not supported"; return; }
+      if (!SR) { $("#ps-voice-status").textContent = "Speech recognition not supported"; $("#ps-voice-status").classList.remove("hidden"); return; }
       if (isRecording && recognition) { recognition.stop(); return; }
       recognition = new SR();
       recognition.lang = "en-US"; recognition.interimResults = true; recognition.continuous = false;
-      recognition.onstart = () => { isRecording = true; $("#ps-voice-btn").classList.add("ps-voice--active"); $("#ps-voice-status").textContent = "Listening..."; };
+      recognition.onstart = () => { isRecording = true; $("#ps-voice-btn").classList.add("ps-voice--active"); $("#ps-voice-status").textContent = "Listening..."; $("#ps-voice-status").classList.remove("hidden"); };
       recognition.onresult = (e) => {
         let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
         $("#ps-chat-input").value = t;
         const ta = $("#ps-chat-input"); ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
       };
       recognition.onend = () => {
-        isRecording = false; $("#ps-voice-btn").classList.remove("ps-voice--active"); $("#ps-voice-status").textContent = "Press the mic to talk";
+        isRecording = false; $("#ps-voice-btn").classList.remove("ps-voice--active"); $("#ps-voice-status").classList.add("hidden");
         if ($("#ps-chat-input").value.trim()) sendChat();
       };
       recognition.onerror = (e) => {
         isRecording = false; $("#ps-voice-btn").classList.remove("ps-voice--active");
         $("#ps-voice-status").textContent = e.error === "not-allowed" ? "Microphone access denied" : "Voice error: " + e.error;
+        setTimeout(() => $("#ps-voice-status").classList.add("hidden"), 3000);
       };
       recognition.start();
     }
@@ -688,7 +642,7 @@
     }
   }
 
-  /* ── capture page ──────────────────────────────── */
+  /* ── capture ───────────────────────────────────── */
   function capturePageContent() {
     const sels = ["article", '[role="main"]', "main", ".post-content", ".entry-content", ".article-body", "#content"];
     let el = null;
@@ -711,9 +665,14 @@
       const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1024, messages: [{ role: "user", content: prompt }] }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || "Claude API error (" + r.status + ")"); }
       const d = await r.json(); return d.content.map((b) => b.text).join("");
-    } else {
+    } else if (provider === "chatgpt") {
       const r = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey }, body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 1024, messages: [{ role: "system", content: "You are a helpful page summarizer." }, { role: "user", content: prompt }] }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || "OpenAI API error (" + r.status + ")"); }
+      const d = await r.json(); return d.choices[0].message.content;
+    } else {
+      // DeepSeek — OpenAI-compatible API
+      const r = await fetch("https://api.deepseek.com/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey }, body: JSON.stringify({ model: "deepseek-chat", max_tokens: 1024, messages: [{ role: "system", content: "You are a helpful page summarizer." }, { role: "user", content: prompt }] }) });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || "DeepSeek API error (" + r.status + ")"); }
       const d = await r.json(); return d.choices[0].message.content;
     }
   }
@@ -724,10 +683,15 @@
       const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1024, system: sys, messages: history.map((m) => ({ role: m.role, content: m.content })) }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || "Claude API error (" + r.status + ")"); }
       const d = await r.json(); return d.content.map((b) => b.text).join("");
-    } else {
+    } else if (provider === "chatgpt") {
       const msgs = [{ role: "system", content: sys }, ...history.map((m) => ({ role: m.role, content: m.content }))];
       const r = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey }, body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 1024, messages: msgs }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || "OpenAI API error (" + r.status + ")"); }
+      const d = await r.json(); return d.choices[0].message.content;
+    } else {
+      const msgs = [{ role: "system", content: sys }, ...history.map((m) => ({ role: m.role, content: m.content }))];
+      const r = await fetch("https://api.deepseek.com/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey }, body: JSON.stringify({ model: "deepseek-chat", max_tokens: 1024, messages: msgs }) });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || "DeepSeek API error (" + r.status + ")"); }
       const d = await r.json(); return d.choices[0].message.content;
     }
   }
