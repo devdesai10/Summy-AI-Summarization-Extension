@@ -1,6 +1,27 @@
-// Open side panel when extension icon is clicked
+// Track whether panel is open
+let panelIsOpen = false;
+
+// Toggle side panel on icon click
 chrome.action.onClicked.addListener(async (tab) => {
-  await chrome.sidePanel.open({ tabId: tab.id });
+  if (panelIsOpen) {
+    // Close by disabling, then re-enabling so it can be opened again
+    await chrome.sidePanel.setOptions({ enabled: false });
+    await chrome.sidePanel.setOptions({ path: "sidepanel.html", enabled: true });
+    panelIsOpen = false;
+  } else {
+    await chrome.sidePanel.open({ tabId: tab.id });
+    panelIsOpen = true;
+  }
+});
+
+// Listen for panel close (when user closes via Chrome's X button)
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "summy-panel") {
+    panelIsOpen = true;
+    port.onDisconnect.addListener(() => {
+      panelIsOpen = false;
+    });
+  }
 });
 
 // Allow the side panel to request page content from any tab

@@ -1,4 +1,7 @@
 (function () {
+  // Connect to background so it can detect when panel closes
+  chrome.runtime.connect({ name: "summy-panel" });
+
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);
 
