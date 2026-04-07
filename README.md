@@ -18,11 +18,10 @@ A Chrome extension that opens a sleek side panel to capture and summarize any we
 
 ## Usage
 
-1. **Click the extension icon** on any webpage — a panel slides open on the right
-2. **Choose your AI provider** — Claude or ChatGPT
-3. **Enter your API key** — it's stored locally in your browser and never sent anywhere except the chosen API
-4. **Click "Summarize This Page"** — the extension extracts the page content and sends it to the AI for a structured summary
-5. **Copy the summary** with one click
+1. **Click the extension icon** on any webpage — a side panel opens
+2. **Click "Capture Screen"** — the extension grabs a screenshot of the current page and copies it to your clipboard
+3. **Choose your AI** — click the Claude, ChatGPT, or DeepSeek button
+4. **A new chat opens in a new tab** — paste your clipboard (`Cmd + V` / `Ctrl + V`) into the chat to send the screenshot to the AI
 
 ---
 
