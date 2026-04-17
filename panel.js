@@ -222,17 +222,7 @@
     }
   }
 
-  // ── copy result ──
-  $("#copy-result").addEventListener("click", () => {
-    const text = $("#result-body").innerText;
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = $("#copy-result"); btn.innerHTML = "&#10003;"; btn.classList.add("copied");
-      setTimeout(() => {
-        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-        btn.classList.remove("copied");
-      }, 1500);
-    });
-  });
+  // (copy button removed)
 
   // ── settings ──
   $("#open-settings").addEventListener("click", () => {
@@ -265,16 +255,35 @@
 
   // ── format markdown ──
   function formatMarkdown(text) {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
+    // Process block-level elements first
+    let result = text
+      // Headers
       .replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
       .replace(/^## (.+)$/gm, '<h3 class="md-h3">$1</h3>')
-      .replace(/^[-•] (.+)$/gm, '<li class="md-li">$1</li>')
-      .replace(/(<li[^>]*>.*?<\/li>\n?)+/g, function(m) { return '<ul class="md-ul">' + m + '</ul>'; })
+      // Bullet points (must come before inline * handling)
+      .replace(/^\* (.+)$/gm, '<li class="md-li">$1</li>')
+      .replace(/^- (.+)$/gm, '<li class="md-li">$1</li>')
+      .replace(/^• (.+)$/gm, '<li class="md-li">$1</li>')
+      // Numbered lists
+      .replace(/^\d+\.\s+(.+)$/gm, '<li class="md-li">$1</li>');
+
+    // Wrap consecutive <li> in <ul>
+    result = result.replace(/(<li[^>]*>.*?<\/li>\n?)+/g, function(m) {
+      return '<ul class="md-ul">' + m + '</ul>';
+    });
+
+    // Inline formatting (after block elements are handled)
+    result = result
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+
+    // Line breaks
+    result = result
       .replace(/\n{2,}/g, "<br><br>")
       .replace(/\n/g, "<br>");
+
+    return result;
   }
 
   // ── toast ──
