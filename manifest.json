@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Summy",
-  "version": "2.3",
-  "description": "AI-powered page summaries — one-click copy & send to Claude, ChatGPT, or DeepSeek",
+  "version": "2.7",
+  "description": "AI-powered page summaries & chat — results shown right in the extension",
   "permissions": [
     "activeTab",
     "scripting",
@@ -23,5 +23,19 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.deepseek.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }
