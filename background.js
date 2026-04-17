@@ -77,11 +77,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const targetUrl = urls[provider];
     if (!targetUrl) { sendResponse({ ok: false }); return; }
 
-    chrome.tabs.create({ url: targetUrl, active: false }, (tab) => {
-      chrome.storage.local.set({
-        summy_pending: { provider, prompt, tabId: tab.id, autoSubmit: true }
+    // Get the current active tab so we can switch back
+    chrome.tabs.query({ active: true, currentWindow: true }, (currentTabs) => {
+      const returnTabId = currentTabs[0]?.id;
+
+      // Open the AI tab as active briefly so it loads fully (Chrome throttles background tabs)
+      chrome.tabs.create({ url: targetUrl, active: true }, (tab) => {
+        chrome.storage.local.set({
+          summy_pending: { provider, prompt, tabId: tab.id, autoSubmit: true }
+        });
+
+        // Switch back to the original tab after a short delay
+        if (returnTabId) {
+          setTimeout(() => {
+            chrome.tabs.update(returnTabId, { active: true }).catch(() => {});
+          }, 1500);
+        }
+
+        sendResponse({ ok: true, tabId: tab.id });
       });
-      sendResponse({ ok: true, tabId: tab.id });
     });
 
     return true;

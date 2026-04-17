@@ -2,10 +2,10 @@
 // Pastes the Summy prompt, optionally auto-submits, and scrapes the AI response.
 
 (function () {
-  const MAX_WAIT = 15000;   // max ms to wait for the input element
+  const MAX_WAIT = 20000;       // max ms to wait for the input element
   const POLL_INTERVAL = 500;
   const RESPONSE_TIMEOUT = 120000; // max ms to wait for AI response (2 min)
-  const RESPONSE_POLL = 1000;
+  const RESPONSE_POLL = 1500;
 
   function detectProvider() {
     const host = location.hostname;
@@ -19,8 +19,8 @@
     if (provider === "claude") {
       return (
         document.querySelector('[contenteditable="true"].ProseMirror') ||
-        document.querySelector('div[contenteditable="true"]') ||
-        document.querySelector('fieldset .ProseMirror')
+        document.querySelector('fieldset .ProseMirror') ||
+        document.querySelector('div[contenteditable="true"]')
       );
     }
     if (provider === "chatgpt") {
@@ -86,8 +86,8 @@
       return (
         document.querySelector('button[aria-label="Send Message"]') ||
         document.querySelector('button[aria-label="Send message"]') ||
-        document.querySelector('fieldset button[type="button"]:last-of-type') ||
-        document.querySelector('button[data-testid="send-button"]')
+        document.querySelector('button[data-testid="send-button"]') ||
+        document.querySelector('fieldset button[type="button"]:last-of-type')
       );
     }
     if (provider === "chatgpt") {
@@ -99,10 +99,9 @@
     }
     if (provider === "deepseek") {
       return (
-        document.querySelector('div[role="button"][aria-disabled]') ||
         document.querySelector('button[aria-label="Send"]') ||
         document.querySelector('textarea + button') ||
-        document.querySelector('button._7436101')
+        document.querySelector('div[role="button"][aria-disabled]')
       );
     }
     return null;
@@ -110,57 +109,70 @@
 
   // ── Scrape the AI response ──
 
-  function getResponseElements(provider) {
+  function getLatestResponseText(provider) {
+    // Use broad selectors and grab the last assistant-looking message block.
+    // Each provider structures its DOM differently, so we try multiple approaches.
+    let candidates = [];
+
     if (provider === "claude") {
-      // Claude renders assistant messages in [data-is-streaming] or .font-claude-message, etc.
-      return document.querySelectorAll(
-        '[data-testid="chat-message-content"], .font-claude-message, [class*="message-content"]'
+      // Claude wraps assistant turns in various containers. Try several.
+      candidates = document.querySelectorAll(
+        '[data-testid="chat-message-content"]'
       );
-    }
-    if (provider === "chatgpt") {
-      return document.querySelectorAll(
-        '[data-message-author-role="assistant"] .markdown, .agent-turn .markdown, [data-testid="conversation-turn-"] .markdown'
+      if (candidates.length === 0) {
+        candidates = document.querySelectorAll('.font-claude-message');
+      }
+      if (candidates.length === 0) {
+        // Fallback: look for the response grid/content area
+        candidates = document.querySelectorAll('[class*="response"], [class*="assistant"]');
+      }
+    } else if (provider === "chatgpt") {
+      candidates = document.querySelectorAll(
+        '[data-message-author-role="assistant"] .markdown'
       );
+      if (candidates.length === 0) {
+        candidates = document.querySelectorAll('.agent-turn .markdown');
+      }
+      if (candidates.length === 0) {
+        candidates = document.querySelectorAll('[class*="assistant"] [class*="markdown"]');
+      }
+    } else if (provider === "deepseek") {
+      candidates = document.querySelectorAll('.ds-markdown--block');
+      if (candidates.length === 0) {
+        candidates = document.querySelectorAll('.markdown-body');
+      }
+      if (candidates.length === 0) {
+        candidates = document.querySelectorAll('[class*="message-content"]');
+      }
     }
-    if (provider === "deepseek") {
-      return document.querySelectorAll(
-        '.ds-markdown--block, [class*="message-content"], .markdown-body'
-      );
-    }
-    return [];
+
+    if (candidates.length === 0) return "";
+    const last = candidates[candidates.length - 1];
+    return (last.innerText || last.textContent || "").trim();
   }
 
   function isStillGenerating(provider) {
     if (provider === "claude") {
-      return !!(
-        document.querySelector('[data-is-streaming="true"]') ||
-        document.querySelector('button[aria-label="Stop Response"]') ||
-        document.querySelector('[class*="stop"]')
-      );
+      // Check for the streaming attribute or the stop button specifically
+      if (document.querySelector('[data-is-streaming="true"]')) return true;
+      const stopBtn = document.querySelector('button[aria-label="Stop Response"]') ||
+                      document.querySelector('button[aria-label="Stop response"]');
+      return !!stopBtn;
     }
     if (provider === "chatgpt") {
       return !!(
         document.querySelector('button[aria-label="Stop generating"]') ||
         document.querySelector('button[data-testid="stop-button"]') ||
-        document.querySelector('[class*="stop-button"]') ||
         document.querySelector('.result-streaming')
       );
     }
     if (provider === "deepseek") {
       return !!(
-        document.querySelector('div[role="button"][aria-disabled="true"]') ||
-        document.querySelector('[class*="stop"]') ||
-        document.querySelector('.loading-spinner')
+        document.querySelector('button[aria-label="Stop generating"]') ||
+        document.querySelector('button[aria-label="Stop Generating"]')
       );
     }
     return false;
-  }
-
-  function getLatestResponseText(provider) {
-    const els = getResponseElements(provider);
-    if (els.length === 0) return "";
-    const last = els[els.length - 1];
-    return (last.innerText || last.textContent || "").trim();
   }
 
   // ── Main injection flow ──
@@ -192,26 +204,32 @@
           setInputValue(el, prompt, provider);
 
           if (autoSubmit) {
-            // Auto-submit: click the send button after a short delay
+            // Try clicking send after a delay to let the framework register the input
             setTimeout(() => {
               const sendBtn = findSendButton(provider);
               if (sendBtn) {
                 sendBtn.click();
-                // Now poll for the response
                 pollForResponse(provider);
               } else {
-                // Couldn't find send button — notify popup of failure
-                chrome.runtime.sendMessage({
-                  type: "SUMMY_RESPONSE",
-                  error: "Could not find the send button on " + provider + ". The prompt was pasted but not submitted."
-                });
-                showBanner("Summy: Couldn't auto-send. Prompt is pasted — press Send manually.", true);
+                // Retry finding the send button once more after another delay
+                setTimeout(() => {
+                  const retryBtn = findSendButton(provider);
+                  if (retryBtn) {
+                    retryBtn.click();
+                    pollForResponse(provider);
+                  } else {
+                    chrome.runtime.sendMessage({
+                      type: "SUMMY_RESPONSE",
+                      error: "Could not find the send button on " + provider + ". The prompt was pasted but not submitted."
+                    });
+                  }
+                }, 1500);
               }
-            }, 800);
+            }, 1000);
           } else {
             showBanner("Summy prompt pasted! Review and press Send when ready.");
           }
-        }, 600);
+        }, 800);
         return;
       }
       if (Date.now() - start > MAX_WAIT) {
@@ -232,41 +250,52 @@
     const start = Date.now();
     let lastText = "";
     let stableCount = 0;
-    // Wait a bit before starting to poll (give the AI time to begin generating)
-    const initialDelay = 3000;
+    let sawGenerating = false;
+
+    // Wait before starting to poll — give the AI time to begin generating
+    const initialDelay = 5000;
 
     setTimeout(() => {
       const poll = setInterval(() => {
         const text = getLatestResponseText(provider);
         const generating = isStillGenerating(provider);
 
-        if (text && text.length > 0 && !generating) {
-          // Response is present and generation has stopped
-          if (text === lastText) {
-            stableCount++;
-          } else {
-            stableCount = 0;
-            lastText = text;
-          }
-          // Wait for text to be stable for 2 consecutive polls
-          if (stableCount >= 2) {
-            clearInterval(poll);
-            chrome.runtime.sendMessage({
-              type: "SUMMY_RESPONSE",
-              text: text
-            });
-            return;
-          }
-        } else if (text && text.length > 0) {
-          // Still generating — update lastText
-          lastText = text;
-          stableCount = 0;
+        // Track if we ever saw the AI start generating
+        if (generating || (text && text.length > 20)) {
+          sawGenerating = true;
         }
 
+        if (text && text.length > 0) {
+          if (generating) {
+            // Still generating — track the text but reset stable count
+            lastText = text;
+            stableCount = 0;
+          } else {
+            // Not generating — check if text is stable
+            if (text === lastText) {
+              stableCount++;
+            } else {
+              stableCount = 0;
+              lastText = text;
+            }
+
+            // If we saw generation happen and text is now stable, we're done.
+            // Also accept if text is long enough and stable (in case we missed the generating state).
+            if (stableCount >= 2 && (sawGenerating || text.length > 50)) {
+              clearInterval(poll);
+              chrome.runtime.sendMessage({
+                type: "SUMMY_RESPONSE",
+                text: text
+              });
+              return;
+            }
+          }
+        }
+
+        // Timeout
         if (Date.now() - start - initialDelay > RESPONSE_TIMEOUT) {
           clearInterval(poll);
-          if (lastText) {
-            // Send whatever we have
+          if (lastText && lastText.length > 20) {
             chrome.runtime.sendMessage({
               type: "SUMMY_RESPONSE",
               text: lastText
@@ -274,7 +303,7 @@
           } else {
             chrome.runtime.sendMessage({
               type: "SUMMY_RESPONSE",
-              error: "Timed out waiting for a response from " + provider + "."
+              error: "Timed out waiting for a response from " + provider + ". The AI page may not have loaded properly in the background tab."
             });
           }
         }
