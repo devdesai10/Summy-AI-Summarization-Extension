@@ -1,6 +1,14 @@
 # Summy — Chrome Extension
 
-AI-powered page summaries and chat. Summy captures the text content of any webpage and sends it to **Claude**, **ChatGPT**, or **DeepSeek** — either via API (results shown inline) or by copying a ready-made prompt and opening the AI chat for you.
+AI-powered page summaries and chat. Summy captures the text content of any webpage and sends it to **Claude**, **ChatGPT**, or **DeepSeek** — either via API or by automatically asking the AI in a background tab — and displays the result right in the side panel.
+
+---
+
+## What's New in v3.0
+
+- **Side panel is now the main UI.** Clicking the extension icon opens a persistent side panel instead of a popup. It stays open while you browse, so results don't disappear when you switch tabs.
+- **Background AI responses without API keys.** When no API key is set, Summy opens the AI chat in a hidden background tab, auto-pastes and submits the prompt, scrapes the response, and displays it in the side panel — no manual pasting or tab switching needed.
+- **Settings built into the side panel.** API keys are managed directly in the side panel via the settings gear icon.
 
 ---
 
@@ -18,6 +26,8 @@ AI-powered page summaries and chat. Summy captures the text content of any webpa
 
 ## How It Works
 
+Click the Summy icon in your toolbar to open the side panel. It stays open alongside the page you're reading.
+
 Summy has three modes:
 
 | Mode | What it does |
@@ -26,20 +36,17 @@ Summy has three modes:
 | **Ask a Question** | Answers a specific question about the page content |
 | **Custom Prompt** | Sends your own prompt along with the page content |
 
-### With API keys (inline results)
+### With API keys (fastest)
 
-1. Click the extension icon to open the popup
-2. Add your API key(s) in **Settings**
-3. Pick a mode, then click a provider — the result appears right in the popup
+1. Open the side panel and add your API key(s) in **Settings** (gear icon)
+2. Pick a mode, then click a provider — the result appears directly in the side panel
 
-### Without API keys (paste and open)
+### Without API keys (automatic)
 
-1. Click the extension icon to open the popup
+1. Open the side panel
 2. Pick a mode, then click a provider
-3. Summy copies a ready-made prompt to your clipboard and opens the AI chat
-4. The prompt is automatically pasted into the chat input — just review and send
-
-Summy also includes a **side panel** view with the same copy-and-open workflow.
+3. Summy opens the AI chat in a background tab, pastes the prompt, and submits it automatically
+4. The response is scraped and displayed in the side panel — no tab switching needed
 
 ---
 
@@ -51,20 +58,18 @@ Summy also includes a **side panel** view with the same copy-and-open workflow.
 | **ChatGPT** | [chatgpt.com](https://chatgpt.com) | [platform.openai.com](https://platform.openai.com/api-keys) → API Keys |
 | **DeepSeek** | [chat.deepseek.com](https://chat.deepseek.com) | [platform.deepseek.com](https://platform.deepseek.com/api_keys) → API Keys |
 
-API keys are **optional**. Without a key, Summy uses the paste-and-open flow instead. Keys are stored in `chrome.storage.local` and never leave your machine except when making the API request to the provider you chose.
+API keys are **optional**. Without a key, Summy opens the AI chat in a background tab, auto-submits the prompt, and brings the response back to the side panel. Keys are stored in `chrome.storage.local` and never leave your machine except when making the API request to the provider you chose.
 
 ---
 
 ## File Structure
 
 ```
-├── manifest.json      # Extension manifest (v3)
-├── background.js      # Service worker — opens AI tabs and stores pending prompts
-├── content.js         # Injected into AI chat pages — auto-pastes the prompt
-├── popup.html         # Popup UI (opened from toolbar icon)
-├── popup.js           # Popup logic — page capture, API calls, paste-and-open
-├── sidepanel.html     # Side panel UI
-├── panel.js           # Side panel logic — copy-and-open flow
+├── manifest.json      # Extension manifest (v3) — side panel config
+├── background.js      # Service worker — opens side panel, relays AI responses
+├── content.js         # Injected into AI chat pages — auto-pastes, auto-submits, scrapes response
+├── sidepanel.html     # Side panel UI (main interface)
+├── panel.js           # Side panel logic — page capture, API calls, background scrape flow, settings
 ├── icons/
 │   ├── icon16.png
 │   ├── icon48.png
@@ -76,8 +81,8 @@ API keys are **optional**. Without a key, Summy uses the paste-and-open flow ins
 
 ## Troubleshooting
 
-- **Popup doesn't show page info?** Refresh the page after installing, or check `chrome://extensions` for errors.
+- **Side panel doesn't open?** Make sure you're on Chrome 114+ (side panel API requirement). Refresh the page after installing, or check `chrome://extensions` for errors.
 - **API error?** Double-check that your key is correct and has credits or balance.
 - **Content is truncated?** Very long pages are trimmed to around 12,000 characters to stay within API limits.
-- **Prompt not auto-pasting?** The content script needs the AI chat page to fully load. If it times out, the prompt is still on your clipboard — just paste manually.
+- **Response not coming back?** The background scraper waits up to 2 minutes for the AI to finish. If it times out, try again or add an API key for more reliable results.
 - **"N/A" status on a page?** Browser internal pages (`chrome://`, `about:`, etc.) can't be read by extensions.

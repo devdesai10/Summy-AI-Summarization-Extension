@@ -1,23 +1,26 @@
 {
   "manifest_version": 3,
   "name": "Summy",
-  "version": "2.7",
-  "description": "AI-powered page summaries & chat — results shown right in the extension",
+  "version": "3.0",
+  "description": "AI-powered page summaries & chat — results shown right in the side panel",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
   },
   "icons": {
     "16": "icons/icon16.png",

@@ -46,6 +46,13 @@
   .header-text { display: flex; flex-direction: column; }
   .title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
   .subtitle { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  .settings-btn {
+    margin-left: auto; background: var(--surface); border: 1px solid var(--border);
+    color: var(--dim); width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s;
+    flex-shrink: 0;
+  }
+  .settings-btn:hover { color: var(--text); background: var(--surface2); }
 
   /* main scrollable area */
   .main {
@@ -54,21 +61,28 @@
     scrollbar-width: thin; scrollbar-color: var(--surface2) transparent;
   }
 
-  /* how it works */
-  .how-it-works {
-    padding: 14px; background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); font-size: 12px; color: var(--dim); line-height: 1.7;
+  /* page info */
+  .page-info {
+    display: flex; align-items: center; gap: 10px; padding: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
   }
-  .how-it-works strong { color: var(--text); }
-  .step { display: flex; gap: 10px; margin-top: 8px; }
-  .step-num {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+  .page-icon {
+    width: 34px; height: 34px; border-radius: 8px; background: var(--surface2);
+    display: flex; align-items: center; justify-content: center; color: var(--dim); flex-shrink: 0;
   }
-  .step-text { flex: 1; }
+  .page-details { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+  .page-title { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .page-url { font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .page-status {
+    font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 5px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .page-status--ok { color: var(--success); background: rgba(34,197,94,0.1); }
+  .page-status--loading { color: #f59e0b; background: rgba(245,158,11,0.1); }
+  .page-status--error { color: #ef4444; background: rgba(239,68,68,0.1); }
 
-  /* prompt mode selector */
+  /* mode tabs */
   .mode-section { display: flex; flex-direction: column; gap: 8px; }
   .mode-label { font-size: 13px; color: var(--dim); }
   .mode-tabs {
@@ -84,23 +98,26 @@
   .mode-tab:hover { color: var(--text); }
   .mode-tab.active { background: var(--surface2); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
-  /* custom prompt */
-  .custom-prompt-area {
+  /* text areas */
+  .input-area {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 10px 14px;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .custom-prompt-area:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
-  .custom-textarea {
+  .input-area:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+  .input-textarea {
     width: 100%; background: none; border: none; color: var(--text);
     font-family: inherit; font-size: 13px; line-height: 1.5;
-    resize: none; outline: none; min-height: 60px; max-height: 150px;
+    resize: none; outline: none; min-height: 50px; max-height: 150px;
   }
-  .custom-textarea::placeholder { color: var(--dim); }
+  .input-textarea::placeholder { color: var(--dim); }
+
+  .section-divider { height: 1px; background: var(--border); margin: 4px 0; }
 
   /* provider buttons */
   .provider-section { display: flex; flex-direction: column; gap: 8px; }
   .provider-label { font-size: 13px; color: var(--dim); }
+  .providers { display: flex; flex-direction: column; gap: 8px; }
 
   .provider-btn {
     width: 100%; display: flex; align-items: center; gap: 12px;
@@ -128,159 +145,227 @@
   .p-text small { font-size: 11px; color: var(--dim); margin-top: 1px; }
 
   .p-action {
-    font-size: 11px; font-weight: 600; color: var(--accent);
-    background: rgba(108,92,231,0.1); padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px;
     white-space: nowrap;
   }
+  .p-action--api { color: var(--accent); background: rgba(108,92,231,0.1); }
+
+  /* no-key hint */
+  .no-key-hint {
+    font-size: 11px; color: var(--dim); text-align: center; line-height: 1.5;
+    padding: 2px 8px;
+  }
+  .no-key-hint a { color: var(--accent); text-decoration: none; }
+  .no-key-hint a:hover { text-decoration: underline; }
+
+  /* result area */
+  .result-area {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; animation: fadeUp 0.3s ease both;
+  }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .result-header h3 { font-size: 14px; font-weight: 700; }
+  .result-actions { display: flex; gap: 5px; }
+  .icon-btn {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--dim); transition: color 0.2s, background 0.2s; font-size: 12px;
+  }
+  .icon-btn:hover { color: var(--text); background: var(--border); }
+  .icon-btn.copied { color: var(--success); }
+  .result-body { font-size: 13px; line-height: 1.7; }
+  .result-body strong { font-weight: 700; }
+  .result-body em { font-style: italic; }
+  .result-body code { background: var(--surface2); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  .result-body .md-h3 { font-size: 13px; font-weight: 700; margin: 14px 0 4px; }
+  .result-body .md-ul { padding-left: 16px; margin: 4px 0; list-style: none; }
+  .result-body .md-li { position: relative; padding-left: 12px; margin-bottom: 5px; }
+  .result-body .md-li::before { content:""; position:absolute; left:0; top:8px; width:5px; height:5px; border-radius:50%; background:var(--accent); }
+
+  /* loading */
+  .loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 28px; }
+  .spinner { width: 24px; height: 24px; border: 2.5px solid var(--surface2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .loading-text { font-size: 13px; color: var(--dim); }
+
+  .error-box {
+    padding: 12px 14px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+    border-radius: var(--radius); font-size: 13px; color: #f87171; animation: fadeUp 0.3s ease both;
+  }
+
+  /* settings view */
+  .settings-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .settings-back {
+    background: none; border: none; color: var(--dim); cursor: pointer;
+    font-family: inherit; font-size: 14px; transition: color 0.2s;
+  }
+  .settings-back:hover { color: var(--text); }
+  .settings-title { font-size: 15px; font-weight: 700; }
+
+  .key-group { margin-bottom: 16px; }
+  .key-label { font-size: 12px; font-weight: 600; color: var(--dim); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .key-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .key-dot--claude { background: var(--claude); }
+  .key-dot--gpt { background: var(--gpt); }
+  .key-dot--deepseek { background: var(--deepseek); }
+  .key-input {
+    width: 100%; padding: 10px 14px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-size: 13px; font-family: 'SFMono-Regular','Consolas',monospace; outline: none;
+    transition: border-color 0.2s;
+  }
+  .key-input:focus { border-color: var(--accent); }
+  .key-input.saved { border-color: var(--success); }
+
+  .save-btn {
+    width: 100%; padding: 12px; border: none; border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; font-family: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer; box-shadow: 0 3px 12px var(--glow); transition: transform 0.1s;
+  }
+  .save-btn:active { transform: scale(0.97); }
+
+  .key-hint { font-size: 11px; color: var(--dim); margin-top: 12px; line-height: 1.6; }
+  .key-hint a { color: var(--accent); text-decoration: none; }
+  .key-hint a:hover { text-decoration: underline; }
 
   /* toast */
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-    background: var(--success); color: #fff; padding: 12px 20px;
-    border-radius: 10px; font-size: 13px; font-weight: 600;
-    box-shadow: 0 6px 20px rgba(34,197,94,0.3);
+    padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
     transition: transform 0.3s cubic-bezier(0.22,1,0.36,1), opacity 0.3s;
     opacity: 0; z-index: 100; pointer-events: none;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px; white-space: nowrap; color: #fff;
   }
   .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-  /* page info */
-  .page-info {
-    display: flex; align-items: center; gap: 10px; padding: 12px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
-  .page-icon {
-    width: 34px; height: 34px; border-radius: 8px; background: var(--surface2);
-    display: flex; align-items: center; justify-content: center; color: var(--dim); flex-shrink: 0;
-  }
-  .page-details { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-  .page-title { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .page-url { font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  .page-status {
-    font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 5px;
-    white-space: nowrap; flex-shrink: 0;
-  }
-  .page-status--ok { color: var(--success); background: rgba(34,197,94,0.1); }
-  .page-status--loading { color: #f59e0b; background: rgba(245,158,11,0.1); }
-  .page-status--error { color: #ef4444; background: rgba(239,68,68,0.1); }
-
-  /* free label */
-  .free-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 10px; font-weight: 700; color: var(--success);
-    background: rgba(34,197,94,0.1); padding: 3px 8px; border-radius: 5px;
-    text-transform: uppercase; letter-spacing: 0.5px;
-  }
-
-  .section-divider {
-    height: 1px; background: var(--border); margin: 4px 0;
-  }
-
-  .tip {
-    font-size: 11px; color: var(--dim); text-align: center; line-height: 1.5;
-    padding: 0 8px;
-  }
 </style>
 </head>
 <body>
 
-  <div class="header">
-    <div class="logo">S</div>
-    <div class="header-text">
-      <div class="title">Summy</div>
-      <div class="subtitle">AI-powered page summaries &amp; chat</div>
+  <!-- ═══ MAIN VIEW ═══ -->
+  <div id="v-main">
+    <div class="header">
+      <div class="logo">S</div>
+      <div class="header-text">
+        <div class="title">Summy</div>
+        <div class="subtitle">AI-powered summaries &amp; chat</div>
+      </div>
+      <button class="settings-btn" id="open-settings" title="API Key Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
     </div>
-    <span class="free-badge" style="margin-left:auto;">Free</span>
+
+    <div class="main">
+      <!-- Page info -->
+      <div class="page-info">
+        <div class="page-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </div>
+        <div class="page-details">
+          <span class="page-title" id="page-title">Loading...</span>
+          <span class="page-url" id="page-url"></span>
+        </div>
+        <span class="page-status page-status--loading" id="page-status">Loading</span>
+      </div>
+
+      <!-- Mode tabs -->
+      <div class="mode-section">
+        <span class="mode-label">What do you want to do?</span>
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="summarize">Summarize</button>
+          <button class="mode-tab" data-mode="chat">Ask a Question</button>
+          <button class="mode-tab" data-mode="custom">Custom</button>
+        </div>
+      </div>
+
+      <!-- Chat question area -->
+      <div class="input-area hidden" id="chat-area">
+        <textarea class="input-textarea" id="chat-input" placeholder="What do you want to ask about this page?"></textarea>
+      </div>
+
+      <!-- Custom prompt area -->
+      <div class="input-area hidden" id="custom-area">
+        <textarea class="input-textarea" id="custom-input" placeholder="Type your prompt... page content is included automatically."></textarea>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Provider buttons (rendered dynamically) -->
+      <div class="provider-section">
+        <span class="provider-label">Get results from:</span>
+        <div class="providers" id="providers"></div>
+      </div>
+
+      <p class="no-key-hint" id="no-key-hint">No API key? No problem — Summy will ask the AI for you in the background. Add keys in <a href="#" id="hint-settings">Settings</a> for faster results.</p>
+
+      <!-- Loading -->
+      <div class="loading hidden" id="loading">
+        <div class="spinner"></div>
+        <span class="loading-text">Analyzing page...</span>
+      </div>
+
+      <!-- Error -->
+      <div class="error-box hidden" id="error-box"></div>
+
+      <!-- Result -->
+      <div class="result-area hidden" id="result-area">
+        <div class="result-header">
+          <h3 id="result-title">Summary</h3>
+          <div class="result-actions">
+            <button class="icon-btn" id="copy-result" title="Copy">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="result-body" id="result-body"></div>
+      </div>
+    </div>
   </div>
 
-  <div class="main">
-
-    <!-- Page info -->
-    <div class="page-info">
-      <div class="page-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-      </div>
-      <div class="page-details">
-        <span class="page-title" id="page-title">Loading page info...</span>
-        <span class="page-url" id="page-url"></span>
-      </div>
-      <span class="page-status page-status--loading" id="page-status">Loading...</span>
-    </div>
-
-    <!-- How it works -->
-    <div class="how-it-works">
-      <strong>How it works:</strong>
-      <div class="step">
-        <span class="step-num">1</span>
-        <span class="step-text">Choose a mode &amp; pick your AI provider below</span>
-      </div>
-      <div class="step">
-        <span class="step-num">2</span>
-        <span class="step-text">Summy grabs the page content and copies a ready-made prompt to your clipboard</span>
-      </div>
-      <div class="step">
-        <span class="step-num">3</span>
-        <span class="step-text">Your AI chat opens — just <strong>Ctrl+V</strong> (or ⌘V) and send!</span>
+  <!-- ═══ SETTINGS VIEW ═══ -->
+  <div id="v-settings" class="hidden">
+    <div class="header">
+      <div class="logo">S</div>
+      <div class="header-text">
+        <div class="title">Summy</div>
+        <div class="subtitle">API Key Settings</div>
       </div>
     </div>
-
-    <!-- Prompt mode selector -->
-    <div class="mode-section">
-      <span class="mode-label">What do you want to do?</span>
-      <div class="mode-tabs">
-        <button class="mode-tab active" data-mode="summarize">Summarize</button>
-        <button class="mode-tab" data-mode="chat">Ask a Question</button>
-        <button class="mode-tab" data-mode="custom">Custom Prompt</button>
+    <div class="main">
+      <div class="settings-header">
+        <button class="settings-back" id="back-btn">&larr; Back</button>
+        <span class="settings-title">API Keys</span>
       </div>
+
+      <div class="key-group">
+        <div class="key-label"><span class="key-dot key-dot--claude"></span> Claude (Anthropic)</div>
+        <input type="password" class="key-input" id="key-claude" placeholder="sk-ant-..." data-provider="claude" />
+      </div>
+      <div class="key-group">
+        <div class="key-label"><span class="key-dot key-dot--gpt"></span> ChatGPT (OpenAI)</div>
+        <input type="password" class="key-input" id="key-chatgpt" placeholder="sk-..." data-provider="chatgpt" />
+      </div>
+      <div class="key-group">
+        <div class="key-label"><span class="key-dot key-dot--deepseek"></span> DeepSeek</div>
+        <input type="password" class="key-input" id="key-deepseek" placeholder="sk-..." data-provider="deepseek" />
+      </div>
+
+      <button class="save-btn" id="save-keys">Save Keys</button>
+
+      <p class="key-hint">
+        Get your keys here:<br>
+        <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a> (Claude)<br>
+        <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> (ChatGPT)<br>
+        <a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com/api_keys</a> (DeepSeek)<br><br>
+        Keys are stored locally and never shared. Without a key, Summy asks the AI in a background tab automatically.
+      </p>
     </div>
-
-    <!-- Custom prompt area (hidden by default) -->
-    <div class="custom-prompt-area hidden" id="custom-area">
-      <textarea class="custom-textarea" id="custom-input" placeholder="Type your prompt here... The page content will be included automatically."></textarea>
-    </div>
-
-    <!-- Chat question area (hidden by default) -->
-    <div class="custom-prompt-area hidden" id="chat-area">
-      <textarea class="custom-textarea" id="chat-input" placeholder="What do you want to ask about this page?"></textarea>
-    </div>
-
-    <div class="section-divider"></div>
-
-    <!-- Provider buttons -->
-    <div class="provider-section">
-      <span class="provider-label">Copy &amp; open in:</span>
-
-      <button class="provider-btn" data-provider="claude">
-        <span class="p-icon p-icon--claude">C</span>
-        <span class="p-text"><strong>Claude</strong><small>claude.ai</small></span>
-        <span class="p-action">Copy &amp; Open</span>
-      </button>
-
-      <button class="provider-btn" data-provider="chatgpt">
-        <span class="p-icon p-icon--gpt">G</span>
-        <span class="p-text"><strong>ChatGPT</strong><small>chatgpt.com</small></span>
-        <span class="p-action">Copy &amp; Open</span>
-      </button>
-
-      <button class="provider-btn" data-provider="deepseek">
-        <span class="p-icon p-icon--deepseek">D</span>
-        <span class="p-text"><strong>DeepSeek</strong><small>chat.deepseek.com</small></span>
-        <span class="p-action">Copy &amp; Open</span>
-      </button>
-    </div>
-
-    <p class="tip">No API keys needed — uses your existing subscriptions or free tiers. Just paste and send!</p>
-
   </div>
 
   <!-- Toast -->
-  <div class="toast" id="toast">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-    <span id="toast-text">Copied! Opening Claude...</span>
-  </div>
+  <div class="toast" id="toast"><span id="toast-text"></span></div>
 
 <script src="panel.js"></script>
 </body>

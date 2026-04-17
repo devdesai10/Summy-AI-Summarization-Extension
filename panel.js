@@ -1,31 +1,78 @@
 (function () {
-  chrome.runtime.connect({ name: "summy-panel" });
-
-  const $ = (s) => document.querySelector(s);
+  const $  = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);
 
   let currentMode = "summarize";
   let pageData = { text: "", title: "", url: "" };
-  let refreshTimer = null;
+  let keys = { claude: "", chatgpt: "", deepseek: "" };
 
-  const URLS = {
-    claude: "https://claude.ai/new",
-    chatgpt: "https://chatgpt.com/",
-    deepseek: "https://chat.deepseek.com/",
-  };
-  const NAMES = {
-    claude: "Claude",
-    chatgpt: "ChatGPT",
-    deepseek: "DeepSeek",
-  };
+  const NAMES = { claude: "Claude", chatgpt: "ChatGPT", deepseek: "DeepSeek" };
 
-  // ── capture page content ──
+  // ── listen for scraped responses from background AI tabs ──
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "SUMMY_RESPONSE") {
+      $("#loading").classList.add("hidden");
+
+      if (msg.error) {
+        $("#error-box").textContent = msg.error;
+        $("#error-box").classList.remove("hidden");
+      } else if (msg.text) {
+        const modeNames = { summarize: "Summary", chat: "Answer", custom: "Response" };
+        $("#result-title").textContent = modeNames[currentMode] || "Response";
+        $("#result-body").innerHTML = formatMarkdown(msg.text);
+        $("#result-area").classList.remove("hidden");
+        $("#result-area").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    if (msg.action === "tabChanged") {
+      setTimeout(refreshPage, 300);
+    }
+  });
+
+  // ── load saved keys ──
+  function loadKeys(cb) {
+    chrome.storage.local.get(["claude_key", "chatgpt_key", "deepseek_key"], (res) => {
+      keys.claude  = res.claude_key  || "";
+      keys.chatgpt = res.chatgpt_key || "";
+      keys.deepseek = res.deepseek_key || "";
+      renderProviders();
+      if (cb) cb();
+    });
+  }
+  loadKeys();
+
+  // ── render provider buttons ──
+  function renderProviders() {
+    const container = $("#providers");
+    container.innerHTML = "";
+    const hasAnyKey = keys.claude || keys.chatgpt || keys.deepseek;
+
+    [
+      { id: "claude",   name: "Claude",   sub: "claude.ai",          icon: "C", cls: "p-icon--claude" },
+      { id: "chatgpt",  name: "ChatGPT",  sub: "chatgpt.com",       icon: "G", cls: "p-icon--gpt" },
+      { id: "deepseek", name: "DeepSeek", sub: "chat.deepseek.com", icon: "D", cls: "p-icon--deepseek" },
+    ].forEach((p) => {
+      const hasKey = !!keys[p.id];
+      const btn = document.createElement("button");
+      btn.className = "provider-btn";
+      btn.dataset.provider = p.id;
+      btn.innerHTML =
+        '<span class="p-icon ' + p.cls + '">' + p.icon + '</span>' +
+        '<span class="p-text"><strong>' + p.name + '</strong><small>' + p.sub + '</small></span>' +
+        '<span class="p-action p-action--api">' +
+        (hasKey ? "Get Summary" : "Get Summary") + '</span>';
+      btn.addEventListener("click", () => handleProvider(p.id));
+      container.appendChild(btn);
+    });
+
+    $("#no-key-hint").classList.toggle("hidden", hasAnyKey);
+  }
+
+  // ── capture page content via background script ──
   function refreshPage() {
     chrome.runtime.sendMessage({ action: "capturePageContent" }, (res) => {
-      if (chrome.runtime.lastError) {
-        // Extension context might have been invalidated, retry
-        return;
-      }
+      if (chrome.runtime.lastError) return;
       if (res) {
         pageData = res;
         updatePageInfo();
@@ -36,9 +83,9 @@
   function updatePageInfo() {
     if (pageData.unsupported) {
       $("#page-title").textContent = pageData.title || "Unsupported Page";
-      $("#page-url").textContent = "This page type can't be captured";
+      $("#page-url").textContent = "This page type can't be read";
       $("#page-status").className = "page-status page-status--error";
-      $("#page-status").textContent = "Not available";
+      $("#page-status").textContent = "N/A";
     } else if (pageData.text) {
       $("#page-title").textContent = pageData.title || "Untitled Page";
       $("#page-url").textContent = pageData.url || "";
@@ -48,10 +95,8 @@
       $("#page-title").textContent = pageData.title || "Loading...";
       $("#page-url").textContent = pageData.url || "";
       $("#page-status").className = "page-status page-status--loading";
-      $("#page-status").textContent = "Loading...";
-      // Retry in 1 second
-      clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(refreshPage, 1000);
+      $("#page-status").textContent = "Loading";
+      setTimeout(refreshPage, 1000);
     }
   }
 
@@ -63,21 +108,10 @@
     if (!document.hidden) refreshPage();
   });
 
-  // Listen for tab changes from background
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.action === "tabChanged") {
-      // Small delay to let the new page finish rendering
-      setTimeout(refreshPage, 300);
-    }
-  });
-
-  // Also poll every 3 seconds as a fallback to catch navigation
-  setInterval(refreshPage, 3000);
-
   // ── mode tabs ──
   $$(".mode-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      $$(".mode-tab").forEach((t) => t.classList.remove("active"));
+      $$(".mode-tab").forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
       currentMode = tab.dataset.mode;
       $("#custom-area").classList.toggle("hidden", currentMode !== "custom");
@@ -87,118 +121,192 @@
 
   // ── build prompt ──
   function buildPrompt() {
-    const text = pageData.text;
-    if (!text) return null;
-
+    if (!pageData.text) return null;
     const header = "Page: " + (pageData.title || "Unknown") + "\nURL: " + (pageData.url || "Unknown") + "\n\n";
-
     if (currentMode === "summarize") {
-      return header +
-        "Please summarize the following web page content. Include:\n" +
-        "1. A one-sentence TLDR\n" +
-        "2. Key points as bullet points\n" +
-        "3. Any notable details or takeaways\n\n" +
-        "---\n" + text + "\n---";
+      return "[Summy — Summarize Mode]\n\n" + header + "Please summarize the following web page content. Include:\n1. A one-sentence TLDR\n2. Key points as bullet points\n3. Any notable details or takeaways\n\n---\n" + pageData.text + "\n---";
     } else if (currentMode === "chat") {
-      const question = $("#chat-input").value.trim();
-      if (!question) return null;
-      return header +
-        "Here is the content of a web page I'm reading:\n\n" +
-        "---\n" + text + "\n---\n\n" +
-        "My question: " + question;
+      const q = $("#chat-input").value.trim();
+      if (!q) return null;
+      return "[Summy — Ask a Question Mode]\n\n" + header + "Here is the content of a web page I'm reading:\n\n---\n" + pageData.text + "\n---\n\nMy question: " + q;
     } else {
-      const custom = $("#custom-input").value.trim();
-      if (!custom) return null;
-      return header +
-        custom + "\n\n" +
-        "Here is the web page content:\n\n" +
-        "---\n" + text + "\n---";
+      const c = $("#custom-input").value.trim();
+      if (!c) return null;
+      return "[Summy — Custom Prompt Mode]\n\n" + header + c + "\n\nHere is the web page content:\n\n---\n" + pageData.text + "\n---";
     }
   }
 
-  // ── provider buttons ──
-  $$(".provider-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const provider = btn.dataset.provider;
+  // ── handle provider click ──
+  async function handleProvider(provider) {
+    if (pageData.unsupported) { showToast("Can't read this page", true); return; }
+    if (currentMode === "chat" && !$("#chat-input").value.trim()) { showToast("Type a question first!", true); return; }
+    if (currentMode === "custom" && !$("#custom-input").value.trim()) { showToast("Type a prompt first!", true); return; }
 
-      // Always do a fresh capture right before copying
-      await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ action: "capturePageContent" }, (res) => {
-          if (res && res.text) {
-            pageData = res;
-            updatePageInfo();
-          }
-          resolve();
-        });
+    // Show loading
+    $("#loading").classList.remove("hidden");
+    $("#result-area").classList.add("hidden");
+    $("#error-box").classList.add("hidden");
+
+    // Fresh capture before building prompt
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "capturePageContent" }, (res) => {
+        if (res && res.text) {
+          pageData = res;
+          updatePageInfo();
+        }
+        resolve();
       });
+    });
 
-      // Validate
-      if (pageData.unsupported) {
-        showToast("Can't read this page type (browser internal page)", true);
-        return;
-      }
+    if (!pageData.text) {
+      $("#loading").classList.add("hidden");
+      showToast("Page content is empty — try refreshing", true);
+      return;
+    }
 
-      if (!pageData.text) {
-        showToast("Page content is empty. Try refreshing the page.", true);
-        return;
-      }
+    const prompt = buildPrompt();
+    if (!prompt) {
+      $("#loading").classList.add("hidden");
+      showToast("Could not build prompt", true);
+      return;
+    }
 
-      if (currentMode === "chat" && !$("#chat-input").value.trim()) {
-        showToast("Type a question first!", true);
-        return;
-      }
+    if (keys[provider]) {
+      // ── API mode: fetch and show inline ──
+      const modeNames = { summarize: "Summary", chat: "Answer", custom: "Response" };
+      $("#result-title").textContent = modeNames[currentMode];
 
-      if (currentMode === "custom" && !$("#custom-input").value.trim()) {
-        showToast("Type a prompt first!", true);
-        return;
-      }
-
-      const prompt = buildPrompt();
-      if (!prompt) {
-        showToast("Could not build prompt. Try again.", true);
-        return;
-      }
-
-      // Copy to clipboard
       try {
-        await navigator.clipboard.writeText(prompt);
+        const response = await callAI(provider, keys[provider], prompt);
+        $("#loading").classList.add("hidden");
+        $("#result-body").innerHTML = formatMarkdown(response);
+        $("#result-area").classList.remove("hidden");
+        $("#result-area").scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (err) {
-        // Fallback for older browsers
-        const ta = document.createElement("textarea");
-        ta.value = prompt;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
+        $("#loading").classList.add("hidden");
+        $("#error-box").textContent = err.message || "Something went wrong.";
+        $("#error-box").classList.remove("hidden");
       }
+    } else {
+      // ── No API key: open AI in background tab, auto-submit, scrape response ──
+      $(".loading-text").textContent = "Asking " + NAMES[provider] + "... this may take a moment";
 
-      // Open AI site
-      window.open(URLS[provider], "_blank");
+      chrome.runtime.sendMessage(
+        { type: "OPEN_AND_PASTE", provider, prompt },
+        (response) => {
+          if (!response || !response.ok) {
+            $("#loading").classList.add("hidden");
+            $("#error-box").textContent = "Failed to open " + NAMES[provider] + ". Try again.";
+            $("#error-box").classList.remove("hidden");
+          }
+          // Otherwise keep loading — SUMMY_RESPONSE listener handles the result
+        }
+      );
+    }
 
-      showToast("Copied! Opening " + NAMES[provider] + "... Just paste & send!");
+    if (currentMode === "chat") $("#chat-input").value = "";
+    if (currentMode === "custom") $("#custom-input").value = "";
+  }
 
-      if (currentMode === "chat") $("#chat-input").value = "";
-      if (currentMode === "custom") $("#custom-input").value = "";
+  // ── AI API calls ──
+  async function callAI(provider, apiKey, prompt) {
+    if (provider === "claude") {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type":"application/json", "x-api-key":apiKey, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
+        body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1024, messages:[{role:"user",content:prompt}] })
+      });
+      if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e?.error?.message||"Claude error ("+r.status+")"); }
+      const d = await r.json(); return d.content.map(b=>b.text).join("");
+    } else if (provider === "chatgpt") {
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type":"application/json", Authorization:"Bearer "+apiKey },
+        body: JSON.stringify({ model:"gpt-4o-mini", max_tokens:1024, messages:[{role:"system",content:"You are a helpful assistant."},{role:"user",content:prompt}] })
+      });
+      if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e?.error?.message||"OpenAI error ("+r.status+")"); }
+      const d = await r.json(); return d.choices[0].message.content;
+    } else {
+      const r = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type":"application/json", Authorization:"Bearer "+apiKey },
+        body: JSON.stringify({ model:"deepseek-chat", max_tokens:1024, messages:[{role:"system",content:"You are a helpful assistant."},{role:"user",content:prompt}] })
+      });
+      if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e?.error?.message||"DeepSeek error ("+r.status+")"); }
+      const d = await r.json(); return d.choices[0].message.content;
+    }
+  }
+
+  // ── copy result ──
+  $("#copy-result").addEventListener("click", () => {
+    const text = $("#result-body").innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = $("#copy-result"); btn.innerHTML = "&#10003;"; btn.classList.add("copied");
+      setTimeout(() => {
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        btn.classList.remove("copied");
+      }, 1500);
     });
   });
 
+  // ── settings ──
+  $("#open-settings").addEventListener("click", () => {
+    $("#v-main").classList.add("hidden");
+    $("#v-settings").classList.remove("hidden");
+    $("#key-claude").value = keys.claude;
+    $("#key-chatgpt").value = keys.chatgpt;
+    $("#key-deepseek").value = keys.deepseek;
+  });
+  $("#back-btn").addEventListener("click", () => {
+    $("#v-settings").classList.add("hidden");
+    $("#v-main").classList.remove("hidden");
+  });
+  $("#hint-settings").addEventListener("click", (e) => {
+    e.preventDefault();
+    $("#open-settings").click();
+  });
+
+  $("#save-keys").addEventListener("click", () => {
+    const c = $("#key-claude").value.trim();
+    const g = $("#key-chatgpt").value.trim();
+    const d = $("#key-deepseek").value.trim();
+    chrome.storage.local.set({ claude_key: c, chatgpt_key: g, deepseek_key: d }, () => {
+      keys.claude = c; keys.chatgpt = g; keys.deepseek = d;
+      renderProviders();
+      showToast("Keys saved!");
+      $$(".key-input").forEach(inp => { inp.classList.add("saved"); setTimeout(()=>inp.classList.remove("saved"), 1200); });
+    });
+  });
+
+  // ── format markdown ──
+  function formatMarkdown(text) {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h3 class="md-h3">$1</h3>')
+      .replace(/^[-•] (.+)$/gm, '<li class="md-li">$1</li>')
+      .replace(/(<li[^>]*>.*?<\/li>\n?)+/g, function(m) { return '<ul class="md-ul">' + m + '</ul>'; })
+      .replace(/\n{2,}/g, "<br><br>")
+      .replace(/\n/g, "<br>");
+  }
+
   // ── toast ──
   function showToast(text, isError) {
-    const toast = $("#toast");
+    const t = $("#toast");
     $("#toast-text").textContent = text;
-    toast.style.background = isError ? "#ef4444" : "#22c55e";
-    toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 2800);
+    t.style.background = isError ? "#ef4444" : "#22c55e";
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2800);
   }
 
   // ── auto-resize textareas ──
-  ["#chat-input", "#custom-input"].forEach((sel) => {
-    $(sel).addEventListener("input", () => {
-      const ta = $(sel);
-      ta.style.height = "auto";
-      ta.style.height = Math.min(ta.scrollHeight, 150) + "px";
+  ["#chat-input", "#custom-input"].forEach(s => {
+    $(s).addEventListener("input", () => {
+      const t = $(s);
+      t.style.height = "auto";
+      t.style.height = Math.min(t.scrollHeight, 150) + "px";
     });
   });
 })();
