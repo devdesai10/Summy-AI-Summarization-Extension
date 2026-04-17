@@ -4,11 +4,13 @@ AI-powered page summaries and chat. Summy captures the text content of any webpa
 
 ---
 
-## What's New in v3.0
+## What's New in v3.2
 
-- **Side panel is now the main UI.** Clicking the extension icon opens a persistent side panel instead of a popup. It stays open while you browse, so results don't disappear when you switch tabs.
-- **Background AI responses without API keys.** When no API key is set, Summy opens the AI chat in a hidden background tab, auto-pastes and submits the prompt, scrapes the response, and displays it in the side panel — no manual pasting or tab switching needed.
-- **Settings built into the side panel.** API keys are managed directly in the side panel via the settings gear icon.
+- **Results now display above the controls.** Summaries and answers appear at the top of the side panel so you see them immediately without scrolling past buttons.
+- **Provider dropdown.** Replaced the three separate provider buttons with a single dropdown menu to pick your AI (Claude, ChatGPT, or DeepSeek) plus one action button. Cleaner, less clutter.
+- **Bug fixes for background scraping.** Fixed an issue where the "Asking Claude..." loading state would hang indefinitely. The root cause was an overly broad CSS selector (`[class*="stop"]`) in the generation-detection logic that matched unrelated elements on the page, making Summy think the AI was always still typing. Tightened all provider selectors to match only the actual stop/streaming indicators.
+- **Background tab loading fix.** Chrome throttles JavaScript in tabs opened with `active: false`, which could prevent AI pages from loading at all. Summy now briefly opens the tab in the foreground so it boots up, then switches back to your original tab automatically.
+- **Longer timeouts and retry logic.** Increased delays for input detection and send-button clicks to account for slower page loads. Added a retry if the send button isn't found on the first attempt.
 
 ---
 

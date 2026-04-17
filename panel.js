@@ -17,11 +17,7 @@
         $("#error-box").textContent = msg.error;
         $("#error-box").classList.remove("hidden");
       } else if (msg.text) {
-        const modeNames = { summarize: "Summary", chat: "Answer", custom: "Response" };
-        $("#result-title").textContent = modeNames[currentMode] || "Response";
-        $("#result-body").innerHTML = formatMarkdown(msg.text);
-        $("#result-area").classList.remove("hidden");
-        $("#result-area").scrollIntoView({ behavior: "smooth", block: "start" });
+        showResult(msg.text);
       }
     }
 
@@ -30,42 +26,28 @@
     }
   });
 
+  function showResult(text) {
+    const modeNames = { summarize: "Summary", chat: "Answer", custom: "Response" };
+    $("#result-title").textContent = modeNames[currentMode] || "Response";
+    $("#result-body").innerHTML = formatMarkdown(text);
+    $("#result-area").classList.remove("hidden");
+    $("#result-area").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   // ── load saved keys ──
   function loadKeys(cb) {
     chrome.storage.local.get(["claude_key", "chatgpt_key", "deepseek_key"], (res) => {
       keys.claude  = res.claude_key  || "";
       keys.chatgpt = res.chatgpt_key || "";
       keys.deepseek = res.deepseek_key || "";
-      renderProviders();
+      updateHint();
       if (cb) cb();
     });
   }
   loadKeys();
 
-  // ── render provider buttons ──
-  function renderProviders() {
-    const container = $("#providers");
-    container.innerHTML = "";
+  function updateHint() {
     const hasAnyKey = keys.claude || keys.chatgpt || keys.deepseek;
-
-    [
-      { id: "claude",   name: "Claude",   sub: "claude.ai",          icon: "C", cls: "p-icon--claude" },
-      { id: "chatgpt",  name: "ChatGPT",  sub: "chatgpt.com",       icon: "G", cls: "p-icon--gpt" },
-      { id: "deepseek", name: "DeepSeek", sub: "chat.deepseek.com", icon: "D", cls: "p-icon--deepseek" },
-    ].forEach((p) => {
-      const hasKey = !!keys[p.id];
-      const btn = document.createElement("button");
-      btn.className = "provider-btn";
-      btn.dataset.provider = p.id;
-      btn.innerHTML =
-        '<span class="p-icon ' + p.cls + '">' + p.icon + '</span>' +
-        '<span class="p-text"><strong>' + p.name + '</strong><small>' + p.sub + '</small></span>' +
-        '<span class="p-action p-action--api">' +
-        (hasKey ? "Get Summary" : "Get Summary") + '</span>';
-      btn.addEventListener("click", () => handleProvider(p.id));
-      container.appendChild(btn);
-    });
-
     $("#no-key-hint").classList.toggle("hidden", hasAnyKey);
   }
 
@@ -116,6 +98,10 @@
       currentMode = tab.dataset.mode;
       $("#custom-area").classList.toggle("hidden", currentMode !== "custom");
       $("#chat-area").classList.toggle("hidden", currentMode !== "chat");
+
+      // Update button label to match mode
+      const labels = { summarize: "Get Summary", chat: "Get Answer", custom: "Run Prompt" };
+      $("#go-btn").textContent = labels[currentMode] || "Go";
     });
   });
 
@@ -136,13 +122,18 @@
     }
   }
 
-  // ── handle provider click ──
+  // ── Go button click ──
+  $("#go-btn").addEventListener("click", () => {
+    const provider = $("#provider-select").value;
+    handleProvider(provider);
+  });
+
   async function handleProvider(provider) {
     if (pageData.unsupported) { showToast("Can't read this page", true); return; }
     if (currentMode === "chat" && !$("#chat-input").value.trim()) { showToast("Type a question first!", true); return; }
     if (currentMode === "custom" && !$("#custom-input").value.trim()) { showToast("Type a prompt first!", true); return; }
 
-    // Show loading
+    // Show loading, hide previous result
     $("#loading").classList.remove("hidden");
     $("#result-area").classList.add("hidden");
     $("#error-box").classList.add("hidden");
@@ -172,23 +163,18 @@
     }
 
     if (keys[provider]) {
-      // ── API mode: fetch and show inline ──
-      const modeNames = { summarize: "Summary", chat: "Answer", custom: "Response" };
-      $("#result-title").textContent = modeNames[currentMode];
-
+      // ── API mode ──
       try {
         const response = await callAI(provider, keys[provider], prompt);
         $("#loading").classList.add("hidden");
-        $("#result-body").innerHTML = formatMarkdown(response);
-        $("#result-area").classList.remove("hidden");
-        $("#result-area").scrollIntoView({ behavior: "smooth", block: "start" });
+        showResult(response);
       } catch (err) {
         $("#loading").classList.add("hidden");
         $("#error-box").textContent = err.message || "Something went wrong.";
         $("#error-box").classList.remove("hidden");
       }
     } else {
-      // ── No API key: open AI in background tab, auto-submit, scrape response ──
+      // ── No API key: background tab scrape ──
       $(".loading-text").textContent = "Asking " + NAMES[provider] + "... this may take a moment";
 
       chrome.runtime.sendMessage(
@@ -199,7 +185,6 @@
             $("#error-box").textContent = "Failed to open " + NAMES[provider] + ". Try again.";
             $("#error-box").classList.remove("hidden");
           }
-          // Otherwise keep loading — SUMMY_RESPONSE listener handles the result
         }
       );
     }
@@ -272,7 +257,7 @@
     const d = $("#key-deepseek").value.trim();
     chrome.storage.local.set({ claude_key: c, chatgpt_key: g, deepseek_key: d }, () => {
       keys.claude = c; keys.chatgpt = g; keys.deepseek = d;
-      renderProviders();
+      updateHint();
       showToast("Keys saved!");
       $$(".key-input").forEach(inp => { inp.classList.add("saved"); setTimeout(()=>inp.classList.remove("saved"), 1200); });
     });
