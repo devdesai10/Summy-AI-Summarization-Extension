@@ -1,10 +1,8 @@
 // background.js — Service worker that opens the side panel on icon click,
 // coordinates background AI tab creation, and relays scraped responses.
 
-// Open side panel when the extension icon is clicked
-chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ windowId: tab.windowId });
-});
+// Let Chrome handle opening the side panel on icon click (no toggle behavior)
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Panel requests page content from the active tab
